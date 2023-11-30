@@ -17,35 +17,39 @@ WIFI_SSID = "UREL-SC661-V-2.4G"
 WIFI_PSWD = "TomFryza"
 THINGSPEAK_API_KEY = "MX7Z5X5MA96ZOIZW"  #We need to check this again
 
-connect_wifi(WIFI_SSID, WIFI_PSWD)
 
 try:
     while True:
-        temperature1, humidity1, soil_humidity = read_sensor_values(temperature_sensor, moisture_sensor)
-        temperature= float(temperature1)
-        humidity= float(humidity1)
+        connect_wifi(WIFI_SSID, WIFI_PSWD) #connecting to wifi
+        temperature1, humidity1, soil_moisture = read_sensor_values(temperature_sensor, moisture_sensor) #reading values from sensors
+        temperature= float(temperature1) #converting values to float
+        humidity= float(humidity1)       #converting values to float
+        params.calculate_parameters(soil_moisture, humidity, temperature) #calculating the soil_moisture limit with given sensor values
         
-        display_data_Soil = f"Mois: {soil_humidity:.1f}% "
-        display_data_Temp = f"Temp: {temperature}C"
-        display_data_Hum =  f"Humi: {humidity}% "
+        
+        display_data_Soil = f"Mois: {soil_moisture:.1f}% " #create string from sensor values to print
+        display_data_Temp = f"Temp: {temperature}C"        #create string from sensor values to print
+        display_data_Hum =  f"Humi: {humidity}% "          #create string from sensor values to print
 
         print(display_data_Soil, display_data_Temp, display_data_Hum)  # Print data to console
         
-        oled.clear_screen()
+        oled.clear_screen() #clearing screen for new message
         oled.show_message(display_data_Soil, display_data_Temp, display_data_Hum)  # Show data on OLED
 
             # We need to calculate threshold value
-        if soil_humidity < params.soil_moisture_limit:  #instead of soil_humidity we can create a mix of all three values from sensors threshold_value
-            relay.control_relay(True, 1000) # calculate the time for relay opening instead of 1s or keep 1s and it will keep opening for 1s till values are above threshold
-            params.check_time = 60
+        if soil_moisture < params.soil_moisture_limit:  #checking if measured moisture is under the limit
+            relay.control_relay(True, 1000) # starts watering for 1m if soil moisture is under the limit
+            params.check_time = 60          # sets sleep time to 1m to check if watering was enought
         else:
-            params.check_time = 1800
+            params.check_time = 1800        #if watering was enought sets check time back to 30m
             
         
-        send_data_to_thingspeak(THINGSPEAK_API_KEY, temperature, humidity, soil_humidity)
-
-        sleep(params.check_time)  # Delay between readings 1m maybe 1800 for 30m
+        send_data_to_thingspeak(THINGSPEAK_API_KEY, temperature, humidity, soil_moisture) #send data to thingspeak
+        disconnect_wifi() #disconnect from wifi
+        
+        sleep(params.check_time)  # sleep according to check time till next measurement
+        
 
 except KeyboardInterrupt:
-    disconnect_wifi()
+    
     print("Execution stopped.")
